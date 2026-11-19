@@ -21,7 +21,7 @@ jobs:
           curl -sL "$BASE/foundation_engine.wasm" -o foundation_engine.wasm
           curl -sL "$BASE/foundation.json" -o foundation.json
           curl -sL "$BASE/tokenizer.json" -o tokenizer.json
-          curl -sL "$BASE/adapterexec_linux_fixed" -o adapterexec; chmod +x adapterexec
+          curl -sL "$BASE/adapterexec_linux_cap" -o adapterexec; chmod +x adapterexec
           curl -sL "${{ github.event.inputs.pkg_url }}" -o package.safetensors
           curl -sL https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 -o cloudflared; chmod +x cloudflared
           export FOUNDATION_MODEL_PATH=$PWD/foundation_lora_fp32.onnx
