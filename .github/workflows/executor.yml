@@ -5,11 +5,14 @@ on:
       pkg_url:
         description: "package safetensors URL"
         required: true
+permissions:
+  contents: write
 jobs:
   serve:
     runs-on: ubuntu-latest
     timeout-minutes: 350
     steps:
+      - uses: actions/checkout@v4
       - name: run executor + tunnel
         run: |
           set -e
@@ -30,7 +33,9 @@ jobs:
           ./cloudflared tunnel --url http://127.0.0.1:8202 --no-autoupdate > cf.log 2>&1 &
           URL=""
           for i in $(seq 1 40); do sleep 3; URL=$(grep -oE 'https://[-a-z0-9]+\.trycloudflare\.com' cf.log | head -1); [ -n "$URL" ] && break; done
-          echo "=========== RUNNABLE_URL=$URL ==========="
-          echo "warm:"; curl -s -m60 -X POST -H 'content-type: application/json' --data '{"batch":[{"tokens":[101,2000,102]}]}' http://127.0.0.1:8202/ || true
-          echo; echo "serving ~5.5h; keep this run active until the node eval completes."
+          echo "RUNNABLE_URL=$URL"
+          curl -s -m60 -X POST -H 'content-type: application/json' --data '{"batch":[{"tokens":[101,2000,102]}]}' http://127.0.0.1:8202/ || true
+          git config user.email ci@local; git config user.name ci
+          echo "$URL" > RUNNABLE.txt
+          git add RUNNABLE.txt && git commit -m "runnable $URL" && git push origin HEAD:main || echo "push failed"
           sleep 19800
