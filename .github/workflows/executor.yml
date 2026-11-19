@@ -1,0 +1,36 @@
+name: adapter-executor
+on:
+  workflow_dispatch:
+    inputs:
+      pkg_url:
+        description: "package safetensors URL"
+        required: true
+jobs:
+  serve:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    steps:
+      - name: run executor + tunnel
+        run: |
+          set -e
+          BASE="https://github.com/sadiqkhzn/lora-eval-packages/releases/download/foundation-v1"
+          curl -sL "$BASE/foundation_lora_fp32.onnx" -o foundation_lora_fp32.onnx
+          curl -sL "$BASE/foundation_engine.wasm" -o foundation_engine.wasm
+          curl -sL "$BASE/foundation.json" -o foundation.json
+          curl -sL "$BASE/tokenizer.json" -o tokenizer.json
+          curl -sL "$BASE/adapterexec_linux_fixed" -o adapterexec; chmod +x adapterexec
+          curl -sL "${{ github.event.inputs.pkg_url }}" -o package.safetensors
+          curl -sL https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 -o cloudflared; chmod +x cloudflared
+          export FOUNDATION_MODEL_PATH=$PWD/foundation_lora_fp32.onnx
+          export FOUNDATION_MODEL_HASH=0a49b325304bb4cf292e683929689d0457966be264f60bfc94d0072b614bf8e6
+          export FOUNDATION_ENGINE_WASM_PATH=$PWD/foundation_engine.wasm
+          export FOUNDATION_ENGINE_WASM_HASH=77643d6e1176ab8744801cef93ccb844d0136ed32b8daa865d541f37d13292de
+          ./adapterexec --package package.safetensors --listen 127.0.0.1:8202 > exe.log 2>&1 &
+          sleep 8
+          ./cloudflared tunnel --url http://127.0.0.1:8202 --no-autoupdate > cf.log 2>&1 &
+          URL=""
+          for i in $(seq 1 40); do sleep 3; URL=$(grep -oE 'https://[-a-z0-9]+\.trycloudflare\.com' cf.log | head -1); [ -n "$URL" ] && break; done
+          echo "=========== RUNNABLE_URL=$URL ==========="
+          echo "warm:"; curl -s -m60 -X POST -H 'content-type: application/json' --data '{"batch":[{"tokens":[101,2000,102]}]}' http://127.0.0.1:8202/ || true
+          echo; echo "serving ~5.5h; keep this run active until the node eval completes."
+          sleep 19800
